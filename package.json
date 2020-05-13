@@ -10,7 +10,7 @@
 		"type": "git",
 		"url": "git://github.com/irrelon/irrelon-serialiser.git"
 	},
-	"main": "./index",
+	"main": "./dist/Serialiser.js",
 	"bugs": {
 		"url": "http://github.com/irrelon/irrelon-serialiser/issues"
 	},
