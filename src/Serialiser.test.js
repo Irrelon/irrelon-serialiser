@@ -1,5 +1,5 @@
 import Serialiser from "./Serialiser";
-import handlers from "./handlers"
+import handlers from "./handlers";
 import assert from "assert";
 
 describe("Serialiser", () => {
@@ -173,6 +173,79 @@ describe("Serialiser", () => {
 				assert.strictEqual(result.foo.toString(), testObj.foo.toString(), "Correct");
 				assert.strictEqual(result.foo(1, 2), 3, "Function call works")
 				assert.strictEqual(testObj.foo(1, 2), 3, "Function call works")
+			});
+		});
+	});
+	
+	describe("Auto-Transcoding", () => {
+		describe("stringify()", () => {
+			it("Can auto-transcode and stringify object hierarchies", () => {
+				const serialiser = new Serialiser();
+				serialiser.addHandler("Date", handlers.Date);
+				serialiser.addHandler("RegExp", handlers.RegExp);
+				serialiser.addHandler("Function", handlers.Function);
+				
+				const testObj1 = {
+					"dt": new Date("1960-12-01T01:02:03Z"),
+					"foo": [{
+						"_id": "123",
+						"num": 34,
+						"func": (a, b) => a + b
+					}, {
+						"regexp": /(.*?)/gi
+					}]
+				};
+				
+				const testObj2 = {
+					"dt": new Date("1960-12-01T01:02:03Z"),
+					"foo": [{
+						"_id": "123",
+						"num": 34,
+						"func": (a, b) => a + b
+					}, {
+						"regexp": /(.*?)/gi
+					}]
+				};
+				
+				// Run stringify without auto-transcoding
+				const result1 = serialiser.stringify(testObj1);
+				
+				// Run it again with auto-transcoding
+				const result2 = serialiser.stringify(testObj2, true);
+				
+				// Run it again without auto-transcoding - it has already
+				// been transcoded though so should resolve to a rich
+				// serialisation rather than a vanilla one because by default
+				// we use mutable object manipulation rather than immutable
+				// cloning and return
+				const result3 = serialiser.stringify(testObj2);
+				
+				assert.strictEqual(result1, "{\"dt\":\"1960-12-01T01:02:03.000Z\",\"foo\":[{\"_id\":\"123\",\"num\":34},{\"regexp\":{}}]}", "Stringify data should match expected");
+				assert.strictEqual(result2, "{\"dt\":\"@date:1960-12-01T01:02:03.000Z\",\"foo\":[{\"_id\":\"123\",\"num\":34,\"func\":\"@function:function func(a, b) {\\n              return a + b;\\n            }\"},{\"regexp\":\"@regexp:5:(.*?):gi\"}]}", "Stringify data should match expected");
+				assert.strictEqual(result3, "{\"dt\":\"@date:1960-12-01T01:02:03.000Z\",\"foo\":[{\"_id\":\"123\",\"num\":34,\"func\":\"@function:function func(a, b) {\\n              return a + b;\\n            }\"},{\"regexp\":\"@regexp:5:(.*?):gi\"}]}", "Stringify data should match expected");
+				
+				// Now parse and check the values
+				const result1p = serialiser.parse(result1);
+				const result2p = serialiser.parse(result2);
+				const result3p = serialiser.parse(result3);
+				
+				assert.deepStrictEqual(result1p, {
+					"dt": "1960-12-01T01:02:03.000Z",
+					"foo": [{
+						"_id": "123",
+						"num": 34
+					}, {
+						"regexp": {}
+					}]
+				}, "The parsed object is as expected");
+				
+				assert.strictEqual(result2p.dt.toISOString(), testObj2.dt.toISOString(), "The parsed object is as expected");
+				assert.strictEqual(result2p.foo[0].func.toString(), testObj2.foo[0].func.toString(), "The parsed object is as expected");
+				assert.strictEqual(result2p.foo[1].regexp.toString(), testObj2.foo[1].regexp.toString(), "The parsed object is as expected");
+				
+				assert.strictEqual(result3p.dt.toISOString(), testObj2.dt.toISOString(), "The parsed object is as expected");
+				assert.strictEqual(result3p.foo[0].func.toString(), testObj2.foo[0].func.toString(), "The parsed object is as expected");
+				assert.strictEqual(result3p.foo[1].regexp.toString(), testObj2.foo[1].regexp.toString(), "The parsed object is as expected");
 			});
 		});
 	});

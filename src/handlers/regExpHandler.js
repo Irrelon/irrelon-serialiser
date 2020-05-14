@@ -2,7 +2,7 @@ const regExpHandler = {
 	"identifier": "@regexp",
 	"stringify": {
 		// Check if we want to operate on this data
-		"match": (objInstance) => objInstance instanceof RegExp,
+		//"match": (objInstance) => objInstance instanceof RegExp,
 		
 		// You can specify a match constructor instead of a `match` function,
 		// this significantly increases the performance of the serialiser but
@@ -21,7 +21,7 @@ const regExpHandler = {
 	"parse": {
 		// Check if we should be responsible for converting this
 		// string data back to an object
-		"match": (data) => typeof data === "string" && data.indexOf("@regexp:") === 0,
+		//"match": (data) => typeof data === "string" && data.indexOf("@regexp:") === 0,
 		
 		// You can specify a match identifier instead of a `match` function,
 		// this significantly increases the performance of the serialiser but

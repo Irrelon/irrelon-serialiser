@@ -28,55 +28,102 @@ class MyReporter extends Mocha.reporters.Base {
 			seenSuites.push(suite);
 			
 			this.decreaseIndent();
-			console.log(color('fail', `${this.indent()}${symbols.err} ${suite.title}`));
+			logLine(EVENT_SUITE_END, color('fail', `${this.indent()}${symbols.err} ${suite.title}`));
 			this.increaseIndent();
 		}
 		
-		runner
-			.once(EVENT_RUN_BEGIN, () => {
-				console.log(color('green', 'Running tests...'));
-			})
-			.on(EVENT_SUITE_BEGIN, (test) => {
-				this.increaseIndent();
-				if (!test.tests.length) {
-					if (test.title) console.log(color('pass', `${this.indent()}${test.title}`));
-				}
-			})
-			.on(EVENT_SUITE_END, (test) => {
-				if (!test.tests.length || test.tests.find((item) => item.state !== "passed")) {
-					this.decreaseIndent();
-					return;
+		const outputArr = [];
+		const logLine = (type, ...args) => outputArr.push({type, args});
+		
+		const processOutput = () => {
+			let inErr = false;
+			
+			const notInErrAcceptTypes = [
+				EVENT_RUN_BEGIN,
+				EVENT_SUITE_BEGIN,
+				//EVENT_SUITE_END,
+				EVENT_TEST_BEGIN,
+				EVENT_TEST_END,
+				EVENT_TEST_PASS,
+				//EVENT_TEST_FAIL,
+				EVENT_RUN_END
+			];
+			
+			const inErrAcceptTypes = [
+				EVENT_RUN_BEGIN,
+				//EVENT_SUITE_BEGIN,
+				//EVENT_SUITE_END,
+				EVENT_TEST_BEGIN,
+				EVENT_TEST_END,
+				//EVENT_TEST_PASS,
+				EVENT_TEST_FAIL,
+				EVENT_RUN_END
+			];
+			
+			const finalArr = outputArr.reduce((finalArr, {type, args}) => {
+				if (type === EVENT_TEST_FAIL) {
+					inErr = true;
 				}
 				
-				if (test.title) {
-					console.log(color('pass', `${this.indent()}${symbols.ok} ${test.title}`));
+				if ((!inErr && notInErrAcceptTypes.indexOf(type) > -1) || (inErr && inErrAcceptTypes.indexOf(type) > -1)) {
+					finalArr.push({type, args});
 				}
+				
+				return finalArr;
+			}, []);
+			
+			finalArr.forEach(({type, args}) => {
+				console.log.apply(console, args);
+			});
+		};
+		
+		runner
+			.once(EVENT_RUN_BEGIN, () => {
+				//logLine(EVENT_RUN_BEGIN, color('green', 'Running tests...'));
+			})
+			.on(EVENT_SUITE_BEGIN, (test) => {
+				//if (!test.tests.length) {
+					if (test.title) logLine(EVENT_SUITE_BEGIN, color('pass', `${this.indent()}- ${test.title}`));
+				//}
+				this.increaseIndent();
+			})
+			.on(EVENT_SUITE_END, (test) => {
+				//if (!test.tests.length || test.tests.find((item) => item.state !== "passed")) {
+				//	this.decreaseIndent();
+				//	return;
+				//}
 				this.decreaseIndent();
+				if (test.title) {
+					logLine(EVENT_SUITE_END, color('pass', `${this.indent()}${symbols.ok} ${test.title}`));
+				}
+				
 			})
 			.on(EVENT_TEST_BEGIN, (test) => {
+				this.increaseIndent();
 				this.increaseIndent();
 				test.startTime = new Date().getTime();
 			})
 			.on(EVENT_TEST_END, (test) => {
+				this.decreaseIndent();
 				this.decreaseIndent();
 			})
 			.on(EVENT_TEST_PASS, (test) => {
 				// Test#fullTitle() returns the suite name(s)
 				// prepended to the test title
 				test.timeTaken = new Date().getTime() - test.startTime;
-				//console.log(color('bright yellow', `${this.indent()}${symbols.ok} ${test.title} - ${test.timeTaken}ms`));
+				logLine(EVENT_TEST_PASS, color('bright yellow', `${this.indent()}${symbols.ok} ${test.title} - ${test.timeTaken}ms`));
 			})
 			.on(EVENT_TEST_FAIL, (test, err) => {
 				outputSuiteFail(test.parent);
 				
 				test.timeTaken = new Date().getTime() - test.startTime;
-				console.log(color('fail',
+				logLine(EVENT_TEST_FAIL, color('fail',
 					`${this.indent()}${symbols.err} ${test.title}`
 				));
 				this.increaseIndent();
 				this.increaseIndent();
 				const files = err.stack.match(/\((.*?)\)/g);
-				console.log(color('fail', `${this.indent()}Assertion:`), err.message, "\n" + this.indent() + "   at " + files[0]);
+				logLine(EVENT_TEST_FAIL, color('fail', `${this.indent()}Assertion:`), err.message, "\n" + this.indent() + "   at " + files[0]);
 				this.increaseIndent();
 				
 				if (typeof err.expected !== "string") {
@@ -87,10 +134,10 @@ class MyReporter extends Mocha.reporters.Base {
 					}
 				}
 				
-				console.log();
-				console.log(color('bright pass', `${this.indent()} Expected:`));
+				logLine(EVENT_TEST_FAIL);
+				logLine(EVENT_TEST_FAIL, color('bright pass', `${this.indent()} Expected:`));
 				this.increaseIndent();
-				console.log(`${this.indent()} ${err.expected.replace(/\n\s*?/g, "\n " + this.indent())}`);
+				logLine(EVENT_TEST_FAIL, `${this.indent()} ${err.expected.replace(/\n\s*?/g, "\n " + this.indent())}`);
 				this.decreaseIndent();
 				
 				if (typeof err.actual !== "string") {
@@ -101,11 +148,11 @@ class MyReporter extends Mocha.reporters.Base {
 					}
 				}
 				
-				console.log();
-				console.log(color('bright fail', `${this.indent()} Actual:`));
+				logLine(EVENT_TEST_FAIL);
+				logLine(EVENT_TEST_FAIL, color('bright fail', `${this.indent()} Actual:`));
 				this.increaseIndent();
-				console.log(`${this.indent()} ${err.actual.replace(/\n\s*?/g, "\n " + this.indent())}`);
-				console.log();
+				logLine(EVENT_TEST_FAIL, `${this.indent()} ${err.actual.replace(/\n\s*?/g, "\n " + this.indent())}`);
+				logLine(EVENT_TEST_FAIL);
 				this.decreaseIndent();
 				
 				this.decreaseIndent();
@@ -117,10 +164,12 @@ class MyReporter extends Mocha.reporters.Base {
 				this.increaseIndent();
 				
 				if (stats.failures) {
-					console.log(color('fail',`${this.indent()}${symbols.ok} Passed: ${stats.passes}/${stats.passes + stats.failures}, ${symbols.err} Failed: ${stats.failures}`));
+					logLine(EVENT_RUN_END, color('fail',`${this.indent()}${symbols.ok} Passed: ${stats.passes}/${stats.passes + stats.failures}, ${symbols.err} Failed: ${stats.failures}`));
 				} else {
-					console.log(color('bright pass', `${this.indent()}${symbols.ok} Passed: ${stats.passes}/${stats.passes + stats.failures}`));
+					logLine(EVENT_RUN_END, color('bright pass', `${this.indent()}${symbols.ok} Passed: ${stats.passes}/${stats.passes + stats.failures}`));
 				}
+				
+				processOutput();
 			});
 	}
 	

@@ -34,6 +34,19 @@ describe("Serialiser", function () {
 
       _assert["default"].strictEqual(result.toJSON, _handlers["default"].Date.stringify.convert, "Correct");
     });
+    it("Calling toJSON() after make returns the correct string", function () {
+      var serialiser = new _Serialiser["default"]();
+      serialiser.addHandler("Date", _handlers["default"].Date);
+      serialiser.addHandler("RegExp", _handlers["default"].RegExp);
+      serialiser.addHandler("Function", _handlers["default"].Function);
+      var intermediary = serialiser.make(new Date("2020-02-03T00:01:02Z"));
+
+      _assert["default"].ok(typeof intermediary.toJSON === "function", "The toJSON property is a function");
+
+      var result = intermediary.toJSON();
+
+      _assert["default"].strictEqual(result, "@date:2020-02-03T00:01:02.000Z", "Correct");
+    });
   });
   describe("stringify()", function () {
     describe("Date", function () {
@@ -144,6 +157,83 @@ describe("Serialiser", function () {
         _assert["default"].strictEqual(result.foo(1, 2), 3, "Function call works");
 
         _assert["default"].strictEqual(testObj.foo(1, 2), 3, "Function call works");
+      });
+    });
+  });
+  describe("Auto-Transcoding", function () {
+    describe("stringify()", function () {
+      it("Can auto-transcode and stringify object hierarchies", function () {
+        var serialiser = new _Serialiser["default"]();
+        serialiser.addHandler("Date", _handlers["default"].Date);
+        serialiser.addHandler("RegExp", _handlers["default"].RegExp);
+        serialiser.addHandler("Function", _handlers["default"].Function);
+        var testObj1 = {
+          "dt": new Date("1960-12-01T01:02:03Z"),
+          "foo": [{
+            "_id": "123",
+            "num": 34,
+            "func": function func(a, b) {
+              return a + b;
+            }
+          }, {
+            "regexp": /(.*?)/gi
+          }]
+        };
+        var testObj2 = {
+          "dt": new Date("1960-12-01T01:02:03Z"),
+          "foo": [{
+            "_id": "123",
+            "num": 34,
+            "func": function func(a, b) {
+              return a + b;
+            }
+          }, {
+            "regexp": /(.*?)/gi
+          }]
+        }; // Run stringify without auto-transcoding
+
+        var result1 = serialiser.stringify(testObj1); // Run it again with auto-transcoding
+
+        var result2 = serialiser.stringify(testObj2, true); // Run it again without auto-transcoding - it has already
+        // been transcoded though so should resolve to a rich
+        // serialisation rather than a vanilla one because by default
+        // we use mutable object manipulation rather than immutable
+        // cloning and return
+
+        var result3 = serialiser.stringify(testObj2);
+
+        _assert["default"].strictEqual(result1, "{\"dt\":\"1960-12-01T01:02:03.000Z\",\"foo\":[{\"_id\":\"123\",\"num\":34},{\"regexp\":{}}]}", "Stringify data should match expected");
+
+        _assert["default"].strictEqual(result2, "{\"dt\":\"@date:1960-12-01T01:02:03.000Z\",\"foo\":[{\"_id\":\"123\",\"num\":34,\"func\":\"@function:function func(a, b) {\\n              return a + b;\\n            }\"},{\"regexp\":\"@regexp:5:(.*?):gi\"}]}", "Stringify data should match expected");
+
+        _assert["default"].strictEqual(result3, "{\"dt\":\"@date:1960-12-01T01:02:03.000Z\",\"foo\":[{\"_id\":\"123\",\"num\":34,\"func\":\"@function:function func(a, b) {\\n              return a + b;\\n            }\"},{\"regexp\":\"@regexp:5:(.*?):gi\"}]}", "Stringify data should match expected"); // Now parse and check the values
+
+
+        var result1p = serialiser.parse(result1);
+        var result2p = serialiser.parse(result2);
+        var result3p = serialiser.parse(result3);
+
+        _assert["default"].deepStrictEqual(result1p, {
+          "dt": "1960-12-01T01:02:03.000Z",
+          "foo": [{
+            "_id": "123",
+            "num": 34
+          }, {
+            "regexp": {}
+          }]
+        }, "The parsed object is as expected");
+
+        _assert["default"].strictEqual(result2p.dt.toISOString(), testObj2.dt.toISOString(), "The parsed object is as expected");
+
+        _assert["default"].strictEqual(result2p.foo[0].func.toString(), testObj2.foo[0].func.toString(), "The parsed object is as expected");
+
+        _assert["default"].strictEqual(result2p.foo[1].regexp.toString(), testObj2.foo[1].regexp.toString(), "The parsed object is as expected");
+
+        _assert["default"].strictEqual(result3p.dt.toISOString(), testObj2.dt.toISOString(), "The parsed object is as expected");
+
+        _assert["default"].strictEqual(result3p.foo[0].func.toString(), testObj2.foo[0].func.toString(), "The parsed object is as expected");
+
+        _assert["default"].strictEqual(result3p.foo[1].regexp.toString(), testObj2.foo[1].regexp.toString(), "The parsed object is as expected");
       });
     });
   });

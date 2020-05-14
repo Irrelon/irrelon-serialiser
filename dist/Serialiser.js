@@ -17,13 +17,14 @@ var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/de
 
 /**
  * @typedef {Object} Transcoder
- * @property {String} [identifier]
+ * @property {String} identifier
  * @property {Object} stringify
- * @property {Function} stringify.match
- * @property {String} [stringify.matchConstructor]
+ * @property {Function} [stringify.match]
+ * @property {String} [stringify.matchConstructorName]
  * @property {Function} stringify.convert
  * @property {Object} parse
- * @property {Function} parse.match
+ * @property {Function} [parse.match]
+ * @property {Boolean} [parse.matchIdentifier]
  * @property {Function} parse.convert
  */
 
@@ -55,8 +56,13 @@ var Serialiser = /*#__PURE__*/function () {
       return data;
     });
     (0, _defineProperty2["default"])(this, "reviver", function (key, data) {
-      // Run through decoders and check for any that are advertising
+      // Attempt early exit
+      if (typeof data !== "string") {
+        return data;
+      } // Run through decoders and check for any that are advertising
       // they want to handle this data identifier
+
+
       var transcoder = _this.getTranscoder(data, "decode");
 
       if (!transcoder) {
@@ -66,7 +72,7 @@ var Serialiser = /*#__PURE__*/function () {
       // back to it's original type
 
 
-      var decodedData = transcoder.parse.convert(data);
+      var decodedData = transcoder.parse.convert(data.substr(transcoder.identifier.length + 1), transcoder);
 
       if (decodedData !== undefined) {
         // The decoder we called matched the object and decoded it
@@ -80,9 +86,10 @@ var Serialiser = /*#__PURE__*/function () {
     (0, _defineProperty2["default"])(this, "parse", function (data) {
       return JSON.parse(data, _this.reviver);
     });
-    (0, _defineProperty2["default"])(this, "stringify", JSON.stringify);
+    this._transcoderById = {};
     this._transcoder = [];
-    this._transcoderLookup = {};
+    this._transcoderForEncodingLookup = {};
+    this._transcoderForDecodingLookup = {};
   }
 
   (0, _createClass2["default"])(Serialiser, [{
@@ -93,15 +100,19 @@ var Serialiser = /*#__PURE__*/function () {
      * a particular piece of data. This allows you to add custom handlers
      * for any type or shape of data such as transcoding functions, dates,
      * regular
-     * @param {String} handles The name of the data handler. This can be any
+     * @param {String} id The name of the data handler. This can be any
      * string you like. Often it is useful to use the name of the constructor
      * / class that the handler will operate on (e.g. `Date` or `RegExp` or
-     * `MyClass`).
+     * `MyClass`). Only one transcoder with a specific id can be registered.
      * @param {Transcoder} transcoder The match and convert functions for encoding
      * and decoding the data.
      */
-    value: function addHandler(handles, transcoder) {
-      if (!handles) {
+    value: function addHandler(id, transcoder) {
+      if (!id) {
+        return false;
+      }
+
+      if (this._transcoderById[id]) {
         return false;
       }
 
@@ -109,32 +120,52 @@ var Serialiser = /*#__PURE__*/function () {
         return false;
       }
 
+      if (!transcoder.identifier) {
+        throw new Error("Transcoder requires `identifier` to be defined");
+      }
+
       if (!transcoder.stringify) {
-        return false;
+        throw new Error("Transcoder requires `stringify` object to be defined");
       }
 
       if (!transcoder.parse) {
-        return false;
+        throw new Error("Transcoder requires `parse` object to be defined");
       }
 
-      if (!transcoder.stringify.match) {
-        return false;
+      if (!transcoder.stringify.match && !transcoder.stringify.matchConstructorName) {
+        throw new Error("Transcoder requires either `stringify.match()` or `stringify.matchConstructorName` to be defined");
       }
 
       if (!transcoder.stringify.convert) {
-        return false;
+        throw new Error("Transcoder requires `stringify.convert()` function to be defined");
       }
 
-      if (!transcoder.parse.match) {
-        return false;
+      if (!transcoder.parse.match && !transcoder.parse.matchIdentifier) {
+        throw new Error("Transcoder requires either `parse.match()` or `parse.matchIdentifier` to be defined");
       }
 
       if (!transcoder.parse.convert) {
-        return false;
+        throw new Error("Transcoder requires `parse.convert()` function to be defined");
       }
 
-      if (transcoder.stringify.matchConstructor) {
-        this._transcoderLookup[transcoder.stringify.matchConstructor] = transcoder;
+      this._transcoderById[id] = transcoder; // Do some wrapping
+
+      var originalConvert = transcoder.stringify.convert;
+
+      if (!originalConvert.___irrelonWrapper) {
+        transcoder.stringify.convert = function () {
+          return "".concat(transcoder.identifier, ":").concat(originalConvert.apply(this));
+        };
+
+        transcoder.stringify.convert.___irrelonWrapper = true;
+      }
+
+      if (transcoder.parse.matchIdentifier && transcoder.identifier) {
+        this._transcoderForDecodingLookup[transcoder.identifier] = transcoder;
+      }
+
+      if (transcoder.stringify.matchConstructorName) {
+        this._transcoderForEncodingLookup[transcoder.stringify.matchConstructorName] = transcoder;
       }
 
       this._transcoder.push(transcoder);
@@ -171,13 +202,13 @@ var Serialiser = /*#__PURE__*/function () {
       var transcoder;
 
       if (data && data.constructor && data.constructor.name) {
-        transcoder = this._transcoderLookup[data.constructor.name];
+        transcoder = this._transcoderForEncodingLookup[data.constructor.name];
       } // Run through encoders and check for any that are advertising
       // they want to handle this data type
 
 
       transcoder = transcoder || this._transcoder.find(function (transcoderItem) {
-        return transcoderItem.stringify.match(data);
+        return transcoderItem.stringify.match ? transcoderItem.stringify.match(data, transcoderItem) : false;
       }); // Return the encoder
 
       if (transcoder) return transcoder;
@@ -185,13 +216,17 @@ var Serialiser = /*#__PURE__*/function () {
     }
   }, {
     key: "getTranscoderForDecoding",
-    value: function getTranscoderForDecoding(data) {
-      // Run through decoders and check for any that are advertising
-      // they want to handle this data type
-      var transcoder = this._transcoder.find(function (transcoderItem) {
-        return transcoderItem.parse.match(data);
-      }); // Return the decoder
+    value: function getTranscoderForDecoding() {
+      var data = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : "";
+      var identifier = data.substr(0, data.indexOf(":"));
+      var transcoder; // Attempt high-speed lookup
 
+      transcoder = this._transcoderForDecodingLookup[identifier]; // Run through decoders and check for any that are advertising
+      // they want to handle this data type
+
+      transcoder = transcoder || this._transcoder.find(function (transcoderItem) {
+        return transcoderItem.parse.match ? transcoderItem.parse.match(data, transcoderItem) : false;
+      }); // Return the decoder
 
       if (transcoder) return transcoder;
       return undefined;
@@ -213,20 +248,44 @@ var Serialiser = /*#__PURE__*/function () {
      */
 
   }, {
+    key: "stringify",
+
+    /**
+     * Converts a JSON object into a stringified version.
+     * @param {Object} data The data to stringify.
+     * @param {Boolean} [autoTranscode=false] If set to true the
+     * serialiser will transcode all instances that have a registered
+     * handler. This is slower than manually wrapping instances you
+     * want to have transcoded in a make() call because we have to
+     * scan the object tree and identify every matching instance rather
+     * than you just telling us where the instances are.
+     * @returns {String} The stringified data.
+     */
+    value: function stringify(data) {
+      var autoTranscode = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
+      return autoTranscode ? this.stringifyMake(data) : JSON.stringify(data);
+    }
+  }, {
     key: "stringifyMake",
     value: function stringifyMake(data) {
-      data = this.makeRecursive(data);
-      return this.stringify(data);
+      return this.stringify(this.makeRecursive(data));
     }
   }, {
     key: "makeRecursive",
     value: function makeRecursive(data) {
+      var _this2 = this;
+
       // Recursively scan the object and auto-make any objects
       // that we find
       if ((0, _typeof2["default"])(data) === "object" && data !== null) {
-        data = this.make(data);
-      }
+        // Scan each property in the object and recurse
+        Object.values(data).forEach(function (value) {
+          return _this2.makeRecursive(value);
+        });
+      } // Wrap the object in make()
 
+
+      data = this.make(data);
       return data;
     }
   }]);

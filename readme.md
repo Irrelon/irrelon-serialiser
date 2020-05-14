@@ -43,7 +43,7 @@ serialiser.addHandler("RegExp", regExpHandler);
 serialiser.addHandler("Function", functionHandler);
 
 const a = {
-	dt: serialiser.make(new Date())
+	dt: serialiser.make(new Date()) // <-- Notice we call make() here?
 };
 
 a.dt instanceof Date; // true
@@ -53,6 +53,25 @@ const c = serialiser.parse(b); // {dt: "2020-02-11T09:52:49.170Z"}
 
 c.dt instanceof Date; // true
 ```
+
+## Optional Transcoding
+You'll notice that when we assign the `Date` instance to the `dt`
+property we call `serialiser.make()`, passing it the `new Date()`.
+The `make()` function is used to mark the `Date` instance as one that
+we want to transcode from instance to string and back to instance.
+
+If you don't wrap the instance of `Date` in a `make()` call the
+serialiser will not operate on it and it will stringify in the normal
+way and also parse in the normal way that `JSON.stringify()` and 
+`JSON.parse()` do. This allows you to have very fine control over
+which instances are transcoded and which are not.
+
+## Auto-Transcoding
+If you don't want to (or can't) call make() on each instance you need
+transcoding (a good example would be when dealing with an arbitrary
+object hierarchy) you can have the serialiser automatically handle
+calling `make()` on every instance that matches a handler you have
+added to it. 
 
 ## Install
 
