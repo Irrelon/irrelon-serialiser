@@ -1,11 +1,12 @@
 {
 	"name": "@irrelon/serialiser",
-	"version": "1.0.0",
+	"author": "Rob Evans (Irrelon Software Limited)",
+	"version": "1.0.1",
 	"private": false,
 	"scripts": {
 		"build": "babel src --out-dir dist",
-		"test": "NODE_ENV=test BABEL_DISABLE_CACHE=1 mocha --reporter ./reporter.js --require @babel/register --require @babel/core --require @babel/polyfill src/**/*.test.js src/**/**/*.test.js",
-		"testMon": "nodemon --watch ./ --exec \"NODE_ENV=test BABEL_DISABLE_CACHE=1 mocha --reporter ./reporter.js --require @babel/register --require @babel/core --require @babel/polyfill src/**/*.test.js src/**/**/*.test.js\""
+		"test": "NODE_ENV=test BABEL_DISABLE_CACHE=1 mocha --reporter @irrelon/mocha-reporter --require @babel/register --require @babel/core --require @babel/polyfill src/**/*.test.js src/**/**/*.test.js",
+		"testMon": "nodemon --watch ./ --exec \"NODE_ENV=test BABEL_DISABLE_CACHE=1 mocha --reporter @irrelon/mocha-reporter --require @babel/register --require @babel/core --require @babel/polyfill src/**/*.test.js src/**/**/*.test.js\""
 	},
 	"repository": {
 		"type": "git",
@@ -17,12 +18,10 @@
 	},
 	"license": "MIT",
 	"dependencies": {
-		"@babel/runtime": "^7.9.2"
+		"@babel/runtime": "^7.9.2",
+		"@irrelon/mocha-reporter": "^1.0.0"
 	},
 	"devDependencies": {
-		"nodemon": "^2.0.3",
-		"@types/assert": "^1.4.6",
-		"@types/mocha": "^7.0.2",
 		"@babel/cli": "^7.4.4",
 		"@babel/core": "^7.4.4",
 		"@babel/plugin-proposal-class-properties": "^7.4.4",
@@ -31,6 +30,8 @@
 		"@babel/preset-env": "^7.4.4",
 		"@babel/preset-react": "^7.0.0",
 		"@babel/register": "^7.4.4",
+		"@types/assert": "^1.4.6",
+		"@types/mocha": "^7.0.2",
 		"babel-loader": "^8.0.5",
 		"enzyme": "^3.9.0",
 		"enzyme-adapter-react-16": "^1.12.1",
@@ -38,6 +39,7 @@
 		"jsdom": "^15.0.0",
 		"mocha": "^6.1.4",
 		"mocha-parallel-tests": "^2.1.0",
+		"nodemon": "^2.0.3",
 		"react": "^16.8.6",
 		"react-dom": "^16.8.6",
 		"react-test-renderer": "^16.8.6",

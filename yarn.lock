@@ -886,6 +886,11 @@
     lodash "^4.17.13"
     to-fast-properties "^2.0.0"
 
+"@irrelon/mocha-reporter@^1.0.0":
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/@irrelon/mocha-reporter/-/mocha-reporter-1.0.0.tgz#351b4f3a6c7f8db23a7f3ffa6d591460593ec1b2"
+  integrity sha512-VxUDGQu5tvUO7FbIhtkZ7N7w7eUHkxQV1iAMCaxBqTN1CPFKwSNpyFDsHadY7ciDGLcwgNTMLA4NKKrrTaDQ9w==
+
 "@sindresorhus/is@^0.14.0":
   version "0.14.0"
   resolved "https://registry.yarnpkg.com/@sindresorhus/is/-/is-0.14.0.tgz#9fb3a3cf3132328151f353de4632e01e52102bea"
